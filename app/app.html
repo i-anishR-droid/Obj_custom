@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevRev Object Customization</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <header class="app-header">
+      <div class="app-header-left">
+        <div class="app-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 12h6M12 9v6"/></svg>
+        </div>
+        <span class="app-title">DevRev Object Customization</span>
+      </div>
+      <div class="leaf-type-selector" id="leaf-type-selector" style="display:none;">
+        <label class="input-label" style="margin:0;font-size:11px;color:var(--text-muted);">Object Type</label>
+        <select class="select" id="leaf-type-select" style="min-width:140px;padding:4px 8px;font-size:12px;">
+          <option value="ticket">Ticket</option>
+          <option value="issue">Issue</option>
+          <option value="conversation">Conversation</option>
+        </select>
+      </div>
+      <div class="app-header-right" id="header-right"></div>
+    </header>
+
+    <nav class="tab-bar" id="tab-bar" style="display: none;"></nav>
+
+    <main class="app-content" id="content"></main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
