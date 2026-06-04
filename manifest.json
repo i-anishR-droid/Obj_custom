@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "Manage DevRev ticket schema customization — fields, parts, groups, dependencies, and rules.",
   "permissions": ["storage"],
-  "host_permissions": ["https://api.devrev.ai/*"],
+  "host_permissions": [
+    "https://api.devrev.ai/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "service-worker.js"
   },

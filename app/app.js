@@ -2,6 +2,7 @@ import { api } from './lib/api-client.js';
 import { getState, setState, subscribe } from './lib/state.js';
 import { initRouter, registerPage, navigate, reloadCurrentPage } from './lib/router.js';
 import { TABS, LEAF_TYPES } from './constants.js';
+import { renderDraftPage } from './pages/draft.js';
 
 // Import pages
 import { AuthPage } from './pages/auth.js';
@@ -62,6 +63,60 @@ function updateVisibility() {
   const isAuth = getState('auth.authenticated');
   document.getElementById('tab-bar').style.display = isAuth ? 'flex' : 'none';
   document.getElementById('leaf-type-selector').style.display = isAuth ? 'flex' : 'none';
+  document.getElementById('mode-bar').style.display = isAuth ? 'flex' : 'none';
+}
+
+// ── Mode switcher (Main / Draft) ───────────────────────────────────────────
+
+let _draftPollTimer = null;
+
+async function updateDraftBadge() {
+  try {
+    const resp = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: 'GET_DRAFTS' }, r => {
+        if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+        resolve(r);
+      });
+    });
+    const count = (resp?.data?.drafts || []).length;
+    const badge = document.getElementById('draft-count-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch { /* server not running — badge stays hidden */ }
+}
+
+function initModeBar() {
+  const mainBtn  = document.getElementById('mode-main');
+  const draftBtn = document.getElementById('mode-draft');
+  const mainContent  = document.getElementById('content');
+  const draftContent = document.getElementById('draft-content');
+
+  function showMain() {
+    mainBtn.classList.add('active');
+    draftBtn.classList.remove('active');
+    mainContent.style.display = '';
+    draftContent.style.display = 'none';
+  }
+
+  function showDraft() {
+    draftBtn.classList.add('active');
+    mainBtn.classList.remove('active');
+    mainContent.style.display = 'none';
+    draftContent.style.display = '';
+    renderDraftPage(draftContent);
+  }
+
+  mainBtn.addEventListener('click', showMain);
+  draftBtn.addEventListener('click', showDraft);
+
+  // Poll draft count every 4 s to keep badge fresh
+  updateDraftBadge();
+  _draftPollTimer = setInterval(updateDraftBadge, 4000);
 }
 
 function initLeafTypeSelector() {
@@ -106,6 +161,7 @@ async function init() {
   renderTabBar();
   renderHeaderRight();
   updateVisibility();
+  initModeBar();
 }
 
 init();

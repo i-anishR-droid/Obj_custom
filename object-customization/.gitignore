@@ -1,0 +1,9 @@
+.env
+.cache/
+state/logs/
+state/payloads/
+state/drafts/
+__pycache__/
+*.pyc
+.venv/
+scripts/.venv/
