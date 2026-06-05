@@ -1,5 +1,5 @@
 {
-  "description": "PAT validation on session start, tool restrictions (no inline Python), and OTel logging for schema operations",
+  "description": "PAT validation on session start, secure PAT cleanup on session end, tool restrictions (no inline Python), and OTel logging for schema operations",
   "hooks": {
     "SessionStart": [
       {
@@ -13,6 +13,17 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check-pats.sh",
             "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/clear-pat.sh",
+            "timeout": 10
           }
         ]
       }

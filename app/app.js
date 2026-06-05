@@ -145,11 +145,17 @@ async function init() {
     renderTabBar();
   });
 
-  // Check existing auth
+  // Check existing auth — also try syncing from agent's draft server
   try {
     const status = await api.auth.getStatus();
     if (status.authenticated) {
       setState('auth', { authenticated: true, user: status.dev_user });
+    } else {
+      // Try to sync PAT from the agent (draft server)
+      const syncResult = await api.auth.syncFromAgent();
+      if (syncResult?.synced) {
+        setState('auth', { authenticated: true, user: syncResult.dev_user });
+      }
     }
   } catch (e) {
     console.log('No existing auth');

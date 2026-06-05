@@ -1,34 +1,41 @@
 # Object Customization Plugin
 
-Manage DevRev object schemas (custom fields, field dependencies, stage diagrams, subtypes) through AI-driven CLI workflows with a **draft/production split**.
+Conversational agent for managing DevRev object schemas (custom fields, field dependencies, stage diagrams, subtypes). The agent asks what changes the user needs, builds validated payloads, and saves them as drafts. The Chrome extension shows a side-by-side comparison (current live state vs proposed changes) so the human can verify before publishing.
 
-## Draft ↔ Production Model
+## How It Works
 
-All changes produced by this plugin are **drafts** — JSON payloads saved to `state/drafts/`. The Chrome extension (`Obj_custom/`) reads these files and shows a persistent banner listing pending changes. Clicking **Publish** in the extension pushes the drafts to DevRev via the API and clears the draft files.
+```
+User describes what they want
+  → Agent asks clarifying questions
+  → Agent fetches current state (refresh_cache.py)
+  → Agent builds payload (schema_engine.py)
+  → Agent validates and saves draft (--save-draft)
+  → Draft includes _original state for comparison
+  → Chrome extension shows side-by-side diff
+  → Human reviews: Current (Live) vs Proposed (Draft)
+  → Human clicks Publish or Discard in the UI
+```
 
-This means:
-1. Claude proposes and validates changes locally (never touches the live API unsolicited)
-2. The user reviews in the Chrome extension and clicks **Publish** to promote
-3. On publish, the extension calls `service-worker.js` which posts to `schemas.custom.set`
+## PAT Flow
 
-## Commands
+The PAT is entered ONCE in the agent conversation:
+1. Agent receives PAT from user
+2. Agent writes it to `state/.auth.json` via draft server (`POST /auth`)
+3. Agent writes it to `.env` for Python scripts
+4. Chrome extension auto-syncs PAT from draft server (no manual entry needed)
+
+## Main Command
+
+`/object-customization:customize` — The primary entry point. Conversational, guides through everything.
+
+## Other Commands
 
 | Command | What it does |
 |---|---|
 | `/object-customization:set-fields` | Create/update/reorder custom fields, manage groups |
 | `/object-customization:dependency-fields` | Build cascading dropdowns and conditional show/hide/require rules |
-| `/object-customization:stage-diagrams` | Define stage diagrams and subtypes |
-| `/object-customization:export-draft` | Show pending drafts and export them for the Chrome extension |
-
-## Setup
-
-```bash
-cd 3-computer-capabilities-nxt/object-customization
-cp .env.example .env
-# Edit .env and add your DEVREV_PAT
-
-pip install -r requirements.txt
-```
+| `/object-customization:stage-diagrams` | Define stage diagrams and workflow transitions |
+| `/object-customization:export-draft` | Show all pending drafts and their status |
 
 ## Core Scripts
 
@@ -39,7 +46,19 @@ pip install -r requirements.txt
 | `scripts/don_resolver.py` | Resolve DON IDs for groups, parts, stages, users, subtypes |
 | `scripts/refresh_cache.py` | Pull latest schemas/stages from DevRev into `.cache/schemas/` |
 | `scripts/draft_manager.py` | Write/read/clear draft files in `state/drafts/` |
-| `scripts/otel_logger.py` | OpenTelemetry JSONL logging |
+| `scripts/draft_server.py` | HTTP bridge — serves drafts + auth to Chrome extension |
+
+## Draft Server Endpoints
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/health` | GET | Health check |
+| `/drafts` | GET | List all pending drafts |
+| `/drafts` | DELETE | Clear all drafts |
+| `/draft/:name` | DELETE | Delete one draft |
+| `/auth` | GET | Read PAT (extension syncs from here) |
+| `/auth` | POST | Save PAT (agent writes here) |
+| `/auth` | DELETE | Clear PAT |
 
 ## Environment Variables
 
@@ -48,15 +67,14 @@ pip install -r requirements.txt
 | `DEVREV_PAT` | Yes | Personal Access Token for DevRev API |
 | `DEVREV_ENDPOINT` | No | Defaults to `https://api.devrev.ai/internal` |
 
-## Pipeline
+## Key Constraints
 
-```
-User describes change
-  → schema_engine.py builds + validates payload
-  → draft_manager.py saves to state/drafts/
-  → Chrome extension shows banner with pending count
-  → User clicks Publish → extension POSTs to DevRev API
-```
+- All schema operations go through `schema_engine.py` — never write temp scripts
+- Drafts are saved to `state/drafts/` before any API call
+- Validation must pass before a draft is written
+- The agent NEVER publishes directly — only saves drafts
+- The human makes the final publish decision in the Chrome extension UI
+- Draft files include `_original` field for side-by-side comparison
 
 ## Cache Layout
 
@@ -73,11 +91,3 @@ All cached data lives in `.cache/schemas/`:
 - **Field names**: snake_case — "Customer Name" → `customer_name`
 - **Stage names**: snake_case — "In Progress" → `in_progress`
 - **Subtype names**: lowercase snake_case (API requirement) — "L1 Support" → `l1_support`
-- **Plugin prefix**: `object-customization`
-
-## Key Constraints
-
-- All schema operations go through `schema_engine.py` — never write temp scripts
-- Blocked: `python3 << 'EOF'` heredocs and Write tool for `.py` files
-- Drafts are saved to `state/drafts/` before any API call
-- Validation must pass before a draft is written

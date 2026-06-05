@@ -75,14 +75,37 @@ Then add show condition:
 
 ## Expression Operators
 
+ONLY these four are accepted by `schemas.custom.set`. The API rejects anything else with `Parse error: expected [== && || !=] operators, got <op>`.
+
 | Operator | Usage |
 |---|---|
 | `==` | Equals |
 | `!=` | Not equals |
 | `&&` | Logical AND |
 | `\|\|` | Logical OR |
-| `in` | Value in list: `custom_fields.priority in ['high', 'critical']` |
-| `not in` | Value not in list |
+
+❌ `in` and `not in` are NOT supported. To match against a list, expand to OR chains:
+
+```json
+// ❌ Rejected by API:
+{"expression": "custom_fields.priority in ['high', 'critical']"}
+
+// ✅ Use this instead:
+{"expression": "custom_fields.priority == 'high' || custom_fields.priority == 'critical'"}
+```
+
+## CRITICAL: Use `name`, NOT `data_name` (no `tnt__` prefix)
+
+The cached/published schema shows custom tenant fields with `data_name: "tnt__priority"` and `name: "priority"`. **Conditions must reference the `name`** in both `expression` and `effects[].fields`.
+
+❌ `custom_fields.tnt__priority == 'high'` → API: `non-existent custom field tnt__priority provided in conditions`
+✅ `custom_fields.priority == 'high'`
+
+Same rule applies in `effects[].fields`:
+```json
+{"effects": [{"fields": ["custom_fields.escalation_notes"], "show": true}]}  // ✅
+{"effects": [{"fields": ["custom_fields.tnt__escalation_notes"], "show": true}]}  // ❌
+```
 
 ## Effect Types
 

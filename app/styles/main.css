@@ -972,3 +972,193 @@ tbody tr:hover { background: var(--bg-hover); }
 
 .collapsible-header.open svg { transform: rotate(90deg); }
 .collapsible-body { padding: 8px 0 8px 22px; }
+
+/* === Draft Comparison View === */
+.draft-card-comparison {
+  padding: 16px 18px;
+  border-top: 1px solid var(--border-light);
+}
+
+.diff-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.comparison-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.comparison-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.comparison-panel-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.comparison-panel-label--original { color: var(--text-muted); }
+.comparison-panel-label--proposed { color: var(--primary); }
+
+.comparison-panel-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.comparison-panel-body {
+  padding: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-card);
+}
+
+.comparison-panel--original {
+  background: #fafafa;
+}
+.comparison-panel--proposed {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.comparison-table th {
+  text-align: left;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-light);
+}
+.comparison-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+.comparison-table tr:last-child td { border-bottom: none; }
+
+.comparison-empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Diff table */
+.diff-section {
+  margin-top: 14px;
+}
+.diff-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.diff-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.diff-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.diff-table tr:last-child td { border-bottom: none; }
+
+/* Condition items */
+.condition-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.condition-item:last-child { border-bottom: none; }
+.condition-expr {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.condition-effects { display: flex; gap: 5px; flex-wrap: wrap; }
+.effect-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid #a7f3d0;
+}
+
+/* Empty state enhancements */
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.empty-state-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 400px;
+}
+.empty-state-body code {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* Auto-auth banner */
+.auto-auth-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--success-light);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--success);
+}
+.auto-auth-banner svg { width: 16px; height: 16px; flex-shrink: 0; }
