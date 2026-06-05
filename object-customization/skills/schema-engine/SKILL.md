@@ -84,6 +84,21 @@ The Chrome extension reads this directory to populate the draft banner.
 | Flag | What happens |
 |---|---|
 | `--save-draft` | Copies payload to `state/drafts/`, Chrome extension will show it |
-| `--publish` | POSTs directly to DevRev API (use only when Chrome extension is not available) |
+| `--publish` | POSTs directly to DevRev API — **DO NOT USE on the user's behalf** |
 
-**Always prefer `--save-draft`** so the user can review in the extension before going live.
+**Agent rule: NEVER call `--publish`.** Stop at `--save-draft`. The human reviews the side-by-side diff in the Chrome extension and clicks Publish themselves. Same applies to direct `curl POST` to `schemas.custom.set` / `stages.custom.set` / any write endpoint — do not bypass the extension.
+
+When a publish fails (user reports an error from the extension):
+1. Read the error message the user shares.
+2. If you need the raw API response to debug, **ask the user for permission first** before doing a one-shot API call.
+3. Fix the payload, re-save the draft, and let the user retry Publish.
+
+## Common publish-time errors and fixes
+
+These errors only surface when the API actually validates the payload (during publish) — `--validate` won't catch them.
+
+| API error message | Cause | Fix |
+|---|---|---|
+| `Parse error: expected [== && \|\| !=] operators, got in` | Used `in` / `not in` operator in a condition expression | Expand to OR chain: `field == "a" \|\| field == "b"` |
+| `non-existent custom field tnt__<name> provided in conditions` | Used the `data_name` (with `tnt__` prefix) instead of `name` | Strip `tnt__` from both `expression` and `effects[].fields`. Use `custom_fields.<name>`, not `custom_fields.tnt__<name>` |
+| 401 Unauthorized from `refresh_cache.py` | PAT got truncated when written to `.env` (long JWT, shell escaping) | `wc -c` the PAT in `.env`, compare last 20 chars to user-supplied token, rewrite with `echo "DEVREV_PAT=$VAR" > .env` |

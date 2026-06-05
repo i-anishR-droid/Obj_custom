@@ -1,9 +1,6 @@
 const API_BASE = 'https://api.devrev.ai';
 const API_INTERNAL = 'https://api.devrev.ai/internal';
 
-// Draft server — the object-customization Claude plugin runs a local HTTP server
-// (draft_server.py) at http://127.0.0.1:<port> that exposes state/drafts/.
-// Default port is 7432. Configurable via chrome.storage.local key 'draftServerPort'.
 async function getDraftServerBase() {
   const { draftServerPort } = await chrome.storage.local.get('draftServerPort');
   const port = draftServerPort || 7432;
@@ -11,8 +8,49 @@ async function getDraftServerBase() {
 }
 
 async function getPat() {
-  const { devrev_pat } = await chrome.storage.local.get('devrev_pat');
-  return devrev_pat || null;
+  const { devrev_pat, pat_source } = await chrome.storage.local.get(['devrev_pat', 'pat_source']);
+
+  // If the PAT came from the agent, re-check the agent each call —
+  // the agent's SessionEnd hook clears it, and we should immediately stop using it.
+  if (pat_source === 'agent') {
+    try {
+      const base = await getDraftServerBase();
+      const resp = await fetch(`${base}/auth`);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.pat) {
+          // Sync if agent rotated the token
+          if (data.pat !== devrev_pat) {
+            await chrome.storage.local.set({ devrev_pat: data.pat, pat_source: 'agent' });
+          }
+          return data.pat;
+        }
+      }
+      // Server reachable but no PAT — agent has cleared it. Wipe local copy.
+      await chrome.storage.local.remove(['devrev_pat', 'pat_source']);
+      return null;
+    } catch {
+      // Server unreachable — fall through to whatever's in storage
+      return devrev_pat || null;
+    }
+  }
+
+  if (devrev_pat) return devrev_pat;
+
+  // No PAT yet — try fetching from agent's draft server
+  try {
+    const base = await getDraftServerBase();
+    const resp = await fetch(`${base}/auth`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.pat) {
+        await chrome.storage.local.set({ devrev_pat: data.pat, pat_source: 'agent' });
+        return data.pat;
+      }
+    }
+  } catch { /* server not running */ }
+
+  return null;
 }
 
 async function apiRequest(method, endpoint, { params, body, useInternal = true } = {}) {
@@ -56,16 +94,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     apiRequest(method, endpoint, { params, body, useInternal })
       .then(data => sendResponse({ success: true, data }))
       .catch(err => sendResponse({ success: false, error: err.message }));
-    return true; // keep channel open for async response
+    return true;
   }
 
   if (message.type === 'SET_AUTH') {
-    chrome.storage.local.set({ devrev_pat: message.pat }, () => {
-      // validate by calling dev-users.self
+    chrome.storage.local.set({ devrev_pat: message.pat, pat_source: 'manual' }, () => {
       apiRequest('GET', 'dev-users.self', { useInternal: false })
         .then(data => sendResponse({ success: true, data }))
         .catch(err => {
-          chrome.storage.local.remove('devrev_pat');
+          chrome.storage.local.remove(['devrev_pat', 'pat_source']);
           sendResponse({ success: false, error: err.message });
         });
     });
@@ -85,16 +122,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Try to sync PAT from draft server (agent pushed it)
+  if (message.type === 'SYNC_AUTH_FROM_AGENT') {
+    (async () => {
+      try {
+        const base = await getDraftServerBase();
+        const resp = await fetch(`${base}/auth`);
+        if (!resp.ok) {
+          sendResponse({ success: true, data: { synced: false, reason: 'server_unavailable' } });
+          return;
+        }
+        const authData = await resp.json();
+        if (!authData.pat) {
+          sendResponse({ success: true, data: { synced: false, reason: 'no_pat' } });
+          return;
+        }
+        await chrome.storage.local.set({ devrev_pat: authData.pat, pat_source: 'agent' });
+        const user = await apiRequest('GET', 'dev-users.self', { useInternal: false });
+        sendResponse({ success: true, data: { synced: true, ...user } });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
   if (message.type === 'CLEAR_AUTH') {
-    chrome.storage.local.remove('devrev_pat', () => {
+    chrome.storage.local.remove(['devrev_pat', 'pat_source'], () => {
       sendResponse({ success: true });
     });
     return true;
   }
 
-  // -------------------------------------------------------------------------
-  // Draft management — read/publish/clear draft files from the Claude plugin
-  // -------------------------------------------------------------------------
+  // ── Draft management ──
 
   if (message.type === 'SET_DRAFT_SERVER_PORT') {
     chrome.storage.local.set({ draftServerPort: message.port }, () => {
@@ -109,14 +169,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const base = await getDraftServerBase();
         const resp = await fetch(`${base}/drafts`);
         if (!resp.ok) {
-          // Draft server not running — return empty with a hint
           sendResponse({ success: true, data: { drafts: [], serverRunning: false } });
           return;
         }
         const data = await resp.json();
         sendResponse({ success: true, data: { drafts: data.drafts || [], serverRunning: true } });
       } catch {
-        // ECONNREFUSED — server not started
         sendResponse({ success: true, data: { drafts: [], serverRunning: false } });
       }
     })();
@@ -149,9 +207,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               : 'schemas.custom.set';
 
             const clean = Object.fromEntries(
-              Object.entries(draft).filter(([k]) => !['draft_type', 'filename', 'error'].includes(k))
+              Object.entries(draft).filter(([k]) => !['draft_type', 'filename', 'error', '_original'].includes(k))
             );
-            // DevRev API requires description — inject fallback if missing
             if (!clean.description) {
               clean.description = `Custom fields for ${clean.subtype_display_name || clean.subtype || clean.leaf_type}`;
             }
@@ -163,7 +220,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
         }
 
-        // If all succeeded, clear via DELETE; otherwise leave failures for retry
         if (failed === 0) {
           await fetch(`${base}/drafts`, { method: 'DELETE' });
         }
@@ -203,7 +259,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           ? 'stage-diagrams.create'
           : 'schemas.custom.set';
         const clean = Object.fromEntries(
-          Object.entries(draft).filter(([k]) => !['draft_type', 'filename', 'error'].includes(k))
+          Object.entries(draft).filter(([k]) => !['draft_type', 'filename', 'error', '_original'].includes(k))
         );
         if (!clean.description) {
           clean.description = `Custom fields for ${clean.subtype_display_name || clean.subtype || clean.leaf_type}`;
@@ -224,6 +280,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const base = await getDraftServerBase();
         await fetch(`${base}/draft/${encodeURIComponent(message.filename)}`, { method: 'DELETE' });
         sendResponse({ success: true, data: { discarded: true } });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+
+  // Fetch original/current state from DevRev for comparison
+  if (message.type === 'FETCH_ORIGINAL_STATE') {
+    (async () => {
+      try {
+        const { leafType, subtype, fragmentType } = message;
+        const params = { leaf_type: leafType };
+        if (fragmentType) params.types = fragmentType;
+        if (subtype) params.subtype = subtype;
+        const data = await apiRequest('GET', 'schemas.custom.list', { params });
+        sendResponse({ success: true, data });
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
