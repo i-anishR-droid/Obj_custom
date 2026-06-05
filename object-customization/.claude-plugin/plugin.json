@@ -1,0 +1,14 @@
+{
+  "name": "object-customization",
+  "version": "0.1.0",
+  "description": "Manage DevRev object customizations including custom fields, field dependencies, stages, stage transitions, and subtypes. Supports draft mode: changes are saved locally and pushed to the Chrome extension's draft layer. Users promote drafts to production by clicking the Publish button in the extension.",
+  "author": {
+    "name": "DevRev Applied AI Team",
+    "email": "applied-ai@devrev.ai",
+    "url": "https://devrev.ai"
+  },
+  "homepage": "https://github.com/devrev/aai-custom-computer-capabilities/tree/main/3-computer-capabilities-nxt/object-customization",
+  "repository": "https://github.com/devrev/aai-custom-computer-capabilities",
+  "license": "MIT",
+  "keywords": ["devrev", "object-customization", "field-dependencies", "stages", "subtypes", "schema", "draft"]
+}
