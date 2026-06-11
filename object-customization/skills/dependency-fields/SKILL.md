@@ -37,17 +37,32 @@ ONLY these four are accepted by `schemas.custom.set`. The API rejects anything e
 | `&&` | Logical AND |
 | `\|\|` | Logical OR |
 
-**`in` and `not in` are NOT supported.** Expand to OR chains:
+❌ `in` and `not in` are NOT supported. To match against a list, expand to OR chains:
+
 ```json
-// ❌ Rejected: "custom_fields.priority in ['high', 'critical']"
-// ✅ Use: "custom_fields.priority == 'high' || custom_fields.priority == 'critical'"
+// ❌ Rejected by API:
+{"expression": "custom_fields.priority in ['high', 'critical']"}
+
+// ✅ Use this instead:
+{"expression": "custom_fields.priority == 'high' || custom_fields.priority == 'critical'"}
 ```
 
-## CRITICAL Rules
+## CRITICAL: Use `name`, NOT `data_name` (no `tnt__` prefix)
 
-1. **Use `name` not `data_name`**: `custom_fields.priority` not `custom_fields.tnt__priority`
-2. **ONE payload per trigger**: All values for the same expression in one condition object
-3. **Combo conditions** for ambiguous mappings: `( custom_fields.l1 == 'X' ) && ( custom_fields.l2 == 'Y' )`
+The cached/published schema shows custom tenant fields with `data_name: "tnt__priority"` and `name: "priority"`. **Conditions must reference the `name`** in both `expression` and `effects[].fields`.
+
+❌ `custom_fields.tnt__priority == 'high'` → API: `non-existent custom field tnt__priority provided in conditions`
+✅ `custom_fields.priority == 'high'`
+
+Same rule applies in `effects[].fields`:
+```json
+{"effects": [{"fields": ["custom_fields.escalation_notes"], "show": true}]}  // ✅
+{"effects": [{"fields": ["custom_fields.tnt__escalation_notes"], "show": true}]}  // ❌
+```
+
+## CRITICAL: ONE Payload Per Trigger
+
+All values for the same expression in one condition object. Multiple conditions with same expression → last wins.
 
 ## Common Patterns
 
@@ -64,6 +79,11 @@ ONLY these four are accepted by `schemas.custom.set`. The API rejects anything e
 ### Conditional Requirement
 ```json
 {"expression": "custom_fields.severity == 'critical'", "effects": [{"fields": ["custom_fields.root_cause"], "require": true}]}
+```
+
+### Combo conditions for ambiguous mappings
+```json
+{"expression": "( custom_fields.l1 == 'X' ) && ( custom_fields.l2 == 'Y' )", "effects": [{"fields": ["custom_fields.l3"], "allowed_values": ["A", "B"]}]}
 ```
 
 ## Effect Types

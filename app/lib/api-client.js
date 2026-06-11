@@ -27,6 +27,7 @@ export const api = {
     connect(pat) { return send({ type: 'SET_AUTH', pat }); },
     disconnect() { return send({ type: 'CLEAR_AUTH' }); },
     getStatus() { return send({ type: 'GET_AUTH' }); },
+    syncFromAgent() { return send({ type: 'SYNC_AUTH_FROM_AGENT' }); },
   },
 
   schemas: {

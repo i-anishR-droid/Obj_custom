@@ -120,11 +120,54 @@ def cmd_write(payload_file: str):
     else:
         draft_name = f"{leaf}_{subtype}_fields_{ts}.json"
 
+    # Embed original state if available from cache (for side-by-side comparison)
+    if '_original' not in data:
+        original = _fetch_original_from_cache(leaf, subtype, dtype)
+        if original:
+            data['_original'] = original
+
     dest = drafts_dir / draft_name
-    shutil.copy2(src, dest)
+    with open(dest, 'w') as f:
+        json.dump(data, f, indent=2)
     print(f"Draft saved: {dest}")
     print(f"\nChrome extension will show this in the draft banner.")
     print(f"Click Publish in the extension to apply to DevRev.")
+
+
+def _fetch_original_from_cache(leaf_type: str, subtype: str, dtype: str):
+    """Try to load original state from cache for comparison in Chrome extension."""
+    cache_dir = plugin_root / '.cache' / 'schemas'
+
+    if dtype == 'stage_diagram':
+        return None
+
+    if subtype and subtype != 'tenant':
+        cache = cache_dir / f'custom_type_fragments_{leaf_type}.json'
+        if cache.exists():
+            try:
+                data = json.load(open(cache))
+                for frag in data.get('fragments', []):
+                    if frag.get('subtype') == subtype:
+                        return {
+                            'fields': frag.get('fields', []),
+                            'conditions': frag.get('conditions', []),
+                        }
+            except Exception:
+                pass
+    else:
+        cache = cache_dir / f'tenant_fragments_{leaf_type}.json'
+        if cache.exists():
+            try:
+                data = json.load(open(cache))
+                frags = data.get('fragments', [])
+                if frags:
+                    return {
+                        'fields': frags[0].get('fields', []),
+                        'conditions': frags[0].get('conditions', []),
+                    }
+            except Exception:
+                pass
+    return None
 
 
 def cmd_publish_all():
