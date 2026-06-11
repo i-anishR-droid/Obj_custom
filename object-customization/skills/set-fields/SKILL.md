@@ -1,19 +1,20 @@
 ---
 name: Field Operations and Management
 description: This skill should be used when creating, updating, or managing DevRev custom fields. Use when the user mentions "create fields", "add fields", "reorder fields", "field ordering", "change field order", "toggle hidden", "make field required", "change allowed values", "stock field overrides", "group creation", "group visibility", "group management", or any field configuration operations.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Set Fields Skill
 
-## Field Creation Workflow
+Route to these tools in order:
 
-1. Check if subtype exists: `schema_engine.py --list-subtype`
-2. List existing fields: `schema_engine.py --subtype "X" --list-fields`
-3. Initialize payload (hydrates from cache to preserve existing data): `--init --load-from-cache`
-4. Add new fields: `--add-fields '[...]'`
-5. Validate: `--validate`
-6. Save draft: `--save-draft` (NEVER `--publish` — see [customize](../customize/SKILL.md))
+1. **refresh-cache** — sync latest schema from DevRev
+2. **list-subtypes** — find available subtypes for the leaf type
+3. **list-fields** — check existing fields to avoid duplicates
+4. **init-payload** — create working payload (always `--load-from-cache`)
+5. **add-fields** — append new fields to the payload
+6. **validate-payload** — ensure correctness
+7. **save-draft** — write to `state/drafts/` for Chrome extension (NEVER `--publish`)
 
 ## Handling name collisions (Skipping duplicate field)
 
@@ -32,73 +33,32 @@ When the user wants to "add" a field but `--load-from-cache` already pulled an e
 
 After merge, the Chrome extension diff should show the field as **modified**, not **added**.
 
-## Reordering Patterns
+## Tool Reference
 
-### Custom fields — update `ui.order` directly
-```json
-{"name": "priority", "ui": {"order": 1}}
-```
+See `tools/` directory for full usage of each tool:
+- `tools/refresh-cache.md`
+- `tools/list-subtypes.md`
+- `tools/list-fields.md`
+- `tools/init-payload.md`
+- `tools/add-fields.md`
+- `tools/validate-payload.md`
+- `tools/save-draft.md`
+- `tools/resolve-don.md` (for group/part visibility conditions)
 
-### Stock fields — use `stock_field_overrides`
-```json
-{"stock_field_overrides": [{"name": "applies_to_part", "ui": {"order": 1}}]}
-```
+## Reordering Fields
 
-### Subtype fields — update individual subtype schema (one subtype at a time)
+Custom fields: update `ui.order` via `--add-fields` (merges on collision).
+Stock fields: use `stock_field_overrides` array in the payload.
 
 ## Group Management
 
-### Create group
-```
-POST /groups.create {"name": "...", "member_type": "dev_user", "type": "static"}
-```
-Returns Group DON ID — store it.
+1. Create group via DevRev API
+2. Use **resolve-don** to get Part DON ID
+3. Update `stock_field_overrides` with `search_query`
+4. Map group to part via API
 
-### Part-specific group visibility (two steps)
+## Field Types
 
-Step 1 — update `stock_field_override` for group:
-```json
-{
-  "name": "group",
-  "ui": {"search_query": "custom_fields.tnt__parts:$object.applies_to_part"}
-}
-```
-
-Step 2 — map group to part:
-```
-POST /groups.update {"id": "don:identity:...:group/72", "custom_fields": {"tnt__parts": ["don:...:capability/5"]}}
-```
-
-## Conditional Requirements Pattern
-
-For subtype fields (custom_type_fragment):
-```json
-{
-  "expression": "( applies_to_part == 'don:...:capability/5' ) && ( stage == 'don:...:custom_stage/25' )",
-  "effects": [{"fields": ["custom_fields.rrn_number"], "require": true}]
-}
-```
-
-For tenant fields (tenant_fragment) — must also include `subtype` check:
-```json
-{
-  "expression": "( applies_to_part == 'don:...:capability/5' ) && ( subtype == 'l1_support' )",
-  "effects": [{"fields": ["custom_fields.customer_id"], "require": true}]
-}
-```
-
-## Resource DON ID Resolution
-
-```bash
-# Parts
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/don_resolver.py --type part --name "UPI"
-
-# Groups
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/don_resolver.py --type group --name "One Touch Escalations"
-
-# Stages
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/don_resolver.py --type stage --name "resolved"
-
-# Subtypes
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/don_resolver.py --type subtype --name "L1 Support" --leaf-type ticket
-```
+**Simple**: text, rich_text, int, double, bool, date, timestamp
+**Complex**: enum (needs `allowed_values`), id (needs `id_type`)
+**Array**: only `text` and `id` support `is_array: true`

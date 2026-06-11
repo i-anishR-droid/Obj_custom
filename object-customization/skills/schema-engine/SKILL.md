@@ -1,83 +1,48 @@
 ---
 name: Schema Engine Reference
 description: Reference documentation for schema_engine.py commands. This skill provides complete CLI reference, workflows, and examples. LOAD THIS SKILL when an agent needs detailed information about schema_engine.py commands, flags, validation rules, or troubleshooting.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Schema Engine Skill
 
-`schema_engine.py` is the single CLI tool for all schema payload operations. Always use it — never write Python scripts inline.
+`schema_engine.py` is the single CLI tool for all schema payload operations. Each operation has its own tool doc in `tools/`.
 
-## Core Flags
+## Tool Index
 
-```bash
-# Initialize a new payload (load from cache if exists)
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --init --load-from-cache --leaf-type ticket --subtype "L1 Support"
-
-# Add fields to working payload
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --payload-file payloads/working/ticket_l1_support.json \
-  --add-fields '[{"name": "priority", "field_type": "enum", "allowed_values": ["low","medium","high"]}]'
-
-# Add conditions
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --payload-file payloads/working/ticket_l1_support.json \
-  --add-conditions '[{"expression": "custom_fields.priority == \"high\"", "effects": [{"fields": ["custom_fields.escalation_notes"], "show": true}]}]'
-
-# Initialize a stage diagram payload
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --init-stage-diagram --load-from-cache --leaf-type ticket --subtype "L1 Support"
-
-# Add stages to diagram
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --payload-file payloads/working/ticket_l1_support_stage_diagram.json \
-  --add-stages '[{"stage_id": "don:...", "is_start": true, "transitions": []}]'
-
-# Validate payload
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --payload-file payloads/working/ticket_l1_support.json \
-  --validate
-
-# Save payload as draft (for Chrome extension to pick up)
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --payload-file payloads/working/ticket_l1_support.json \
-  --save-draft
-
-# List existing subtypes
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py --list-subtype
-
-# List fields for a subtype
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py --subtype "L1 Support" --list-fields
-
-# Show current payload content
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py \
-  --payload-file payloads/working/ticket_l1_support.json --show
-
-# Get examples for fields or stages
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py --get-examples field
-${CLAUDE_PLUGIN_ROOT}/../../.venvs/object-customization/bin/python3 ${CLAUDE_PLUGIN_ROOT}/scripts/schema_engine.py --get-examples stage
-```
-
-## Working File Naming
-
-| Object type | Subtype | Working file |
+| Tool | File | Purpose |
 |---|---|---|
-| ticket | l1_support | `payloads/working/ticket_l1_support.json` |
-| ticket | l1_support (stage diagram) | `payloads/working/ticket_l1_support_stage_diagram.json` |
-| issue | bug | `payloads/working/issue_bug.json` |
-| ticket | (tenant) | `payloads/working/ticket_tenant.json` |
+| refresh-cache | `tools/refresh-cache.md` | Pull latest schema from DevRev |
+| list-subtypes | `tools/list-subtypes.md` | List subtypes per leaf type |
+| list-fields | `tools/list-fields.md` | List existing fields |
+| init-payload | `tools/init-payload.md` | Initialize working payload |
+| add-fields | `tools/add-fields.md` | Add custom fields |
+| add-conditions | `tools/add-conditions.md` | Add dependency conditions |
+| init-stage-diagram | `tools/init-stage-diagram.md` | Initialize stage diagram |
+| add-stages | `tools/add-stages.md` | Add stages + transitions |
+| validate-payload | `tools/validate-payload.md` | Validate before saving |
+| save-draft | `tools/save-draft.md` | Save to drafts dir |
+| show-payload | `tools/show-payload.md` | Print payload JSON |
+| resolve-don | `tools/resolve-don.md` | Name → DON ID resolution |
+| list-drafts | `tools/list-drafts.md` | Show pending drafts |
+| clear-drafts | `tools/clear-drafts.md` | Discard all drafts |
+| start-draft-server | `tools/start-draft-server.md` | Launch HTTP bridge |
+| get-examples | `tools/get-examples.md` | Print example JSON |
 
-## Draft Files
+## Standard Workflow
 
-Draft files are written to `state/drafts/` with timestamp:
 ```
-state/drafts/ticket_l1_support_fields_20260603_141523.json
-state/drafts/ticket_l1_support_deps_20260603_141801.json
-state/drafts/stage_diagram_ticket_l1_support_20260603_142100.json
+refresh-cache → list-subtypes → list-fields → init-payload → add-fields/add-conditions → validate-payload → save-draft
 ```
 
-The Chrome extension reads this directory to populate the draft banner.
+## Key Constraints
+
+- All operations via `schema_engine.py` — never write temp scripts
+- Always `--load-from-cache` on init (prevents data loss)
+- Always `--validate` before `--save-draft`
+- NEVER use `--publish` — drafts only
+- Field names in snake_case
+- Use `name` not `data_name` in expressions
 
 ## --save-draft vs --publish
 
